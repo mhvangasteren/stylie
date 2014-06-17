@@ -1,48 +1,7 @@
+@import '../../bower_components/jck-library-extensions/src/backbone/sass/tabs';
+@import 'bezierizer';
+
 $IMAGE_DIR: '../../img';
-
-/* Bezierizer styles
- */
-.bezierizer-container {
-  border-radius: 2px;
-  padding: 10px;
-}
-
-.bezierizer-canvas-container {
-  height: 310px;
-  position: relative;
-  width: 310px;
-}
-
-  .bezierizer-canvas-container canvas {
-    background: #555;
-    height: 310px;
-    width: 310px;
-  }
-
-  .bezierizer-canvas-container .bezierizer-handle-container {
-    height: 330px;
-    left: -10px;
-    overflow: hidden;
-    position: absolute;
-    top: -10px;
-    width: 330px;
-  }
-
-    .bezierizer-canvas-container .bezierizer-handle {
-      background: #999;
-      border-radius: 12px;
-      border: solid 4px #333;
-      height: 24px;
-      left: 0;
-      position: absolute;
-      top: 0;
-      width: 24px;
-    }
-
-    .bezierizer-canvas-container .bezierizer-handle:focus {
-      outline: none;
-    }
-/* /Bezierizer styles */
 
 body {
   margin: 0;
@@ -735,62 +694,6 @@ canvas {
   position: absolute;
   z-index: 100;
 }
-
-.tabs {
-  display: block;
-  background: #1a1a1a;
-  border-bottom: solid 1px #454545;
-  height: 30px;
-  line-height: 30px;
-  overflow: visible;
-  padding-top: 3px;
-}
-
-  .tabs li {
-    height: 29px;
-    margin: 0 8px;
-    padding: 0 4px;
-    position: relative;
-    float: left;
-    -webkit-border-top-left-radius: 2px;
-    -webkit-border-top-right-radius: 2px;
-    -moz-border-radius-topleft: 2px;
-    -moz-border-radius-topright: 2px;
-    border-top-left-radius: 2px;
-    border-top-right-radius: 2px;
-  }
-
-    .tabs a {
-      color: #454545;
-    }
-
-  .tabs li.tabs-active {
-    background: #353535;
-    border: solid 1px #454545;
-    border-bottom: solid 1px #353535;
-    top: 1px;
-  }
-
-    .tabs li.tabs-active a {
-      color: #fefefe;
-    }
-
-  .tabs li:first-child {
-    margin-left: 6px;
-  }
-
-  .tabs li a {
-    padding: 0px 4px;
-  }
-
-.tabs-contents {
-  padding: 6px 12px 12px;
-}
-
-  .tabs-contents > li {
-    position: relative;
-    width: 335px;
-  }
 
 .checkboxes {
   width: 270px;
