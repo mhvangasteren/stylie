@@ -5,11 +5,10 @@ define([
   ,'backbone'
   ,'mustache'
 
-  ,'src/app'
+  ,'incrementer-field'
+
   ,'src/constants'
-  ,'src/utils'
-  ,'src/ui/incrementer-field'
-  ,'src/ui/ease-select'
+  ,'src/view/ease-select'
 
 ], function (
 
@@ -18,26 +17,27 @@ define([
   ,Backbone
   ,Mustache
 
-  ,app
-  ,constant
-  ,util
   ,IncrementerFieldView
+
+  ,constant
   ,EaseSelectView
 
 ) {
 
   function incrementerGeneratorHelper ($el) {
-    return new IncrementerFieldView({
-      '$el': $el
-
-      ,'onValReenter': _.bind(function (val) {
-        this.model.set($el.data('keyframeattr'), +val);
-        Backbone.trigger(constant.PATH_CHANGED);
-        // TODO: Should access actor through the owner model
-        app.collection.actors.getCurrent(0).updateKeyframes();
-        app.rekapi.update();
-      }, this)
+    var incrementerFieldView = new IncrementerFieldView({
+      'el': $el[0]
     });
+
+    incrementerFieldView.onValReenter = _.bind(function (val) {
+      this.model.set($el.data('keyframeattr'), +val);
+      Backbone.trigger(constant.PATH_CHANGED);
+      // TODO: Should access actor through the owner model
+      this.stylie.collection.actors.getCurrent(0).updateKeyframes();
+      this.stylie.rekapi.update();
+    }, this);
+
+    return incrementerFieldView;
   }
 
   var KEYFRAME_TEMPLATE = [
@@ -48,6 +48,7 @@ define([
       ,'</li>'
     ].join('');
 
+  /* jshint maxlen: 300 */
   var KEYFRAME_PROPERTY_TEMPLATE = [
       '<div class="property-field">'
         ,'<label>'
@@ -64,6 +65,7 @@ define([
       ,'</label>'
     ].join('');
 
+  /* jshint maxlen: 100 */
   var EASE_SELECT_TEMPLATE = [
       '<select class="easing {{property}}-easing" data-axis="{{property}}"></select>'
     ].join('');
@@ -79,8 +81,15 @@ define([
       ,'click .remove button': 'removeKeyframe'
     }
 
+    /**
+     * @param {Object} opts
+     *   @param {Stylie} stylie
+     *   @param {ActorModel} owner
+     *   @param {KeyframeModel} model
+     */
     ,'initialize': function (opts) {
-      _.extend(this, opts);
+      this.stylie = opts.stylie;
+      this.owner = opts.owner;
 
       this.isEditingMillisecond = false;
       this.canEditMillisecond = !this.isFirstKeyfame();
@@ -127,7 +136,12 @@ define([
     }
 
     ,'initIncrementers': function () {
-      _.each([this.$inputX, this.$inputY, this.$inputRX, this.$inputRY, this.$inputRZ], function ($el) {
+      _.each([
+          this.$inputX,
+          this.$inputY,
+          this.$inputRX,
+          this.$inputRY,
+          this.$inputRZ], function ($el) {
         var $input = $el.find('input');
         var keyframeAttr = $input.data('keyframeattr');
         this['incrementerView' + keyframeAttr.toUpperCase()] =
@@ -139,20 +153,26 @@ define([
           'value': this.model.get('millisecond')
         });
 
-        this.millisecondIncrementer = new IncrementerFieldView({
-          '$el': $(template)
-          ,'onBlur': _.bind(this.onMillisecondIncrementerBlur, this)
-
-          // Defer to the blur event handler for all code paths that call
-          // onMillisecondIncrementerBlur.  It's a browser-level event and
-          // inserts its handler into the JavaScript thread synchronously,
-          // creating null pointers that jQuery is not expecting in
-          // jQuery#remove.
-          ,'onEnterDown': _.bind(function () {
-             this.millisecondIncrementer.freeMousewheel();
-             this.millisecondIncrementer.$el.trigger('blur');
-          }, this)
+        var millisecondIncrementer = new IncrementerFieldView({
+          'el': $(template)[0]
         });
+
+        millisecondIncrementer.onBlur =
+            _.bind(this.onMillisecondIncrementerBlur, this);
+
+        // Defer to the blur event handler for all code paths that call
+        // onMillisecondIncrementerBlur.  It's a browser-level event and
+        // inserts its handler into the JavaScript thread synchronously,
+        // creating null pointers that jQuery is not expecting in
+        // jQuery#remove.
+        millisecondIncrementer.onEnterDown = function (evt) {
+          evt.preventDefault();
+          millisecondIncrementer.freeMousewheel();
+          millisecondIncrementer.$el.trigger('blur');
+        };
+
+        millisecondIncrementer.delegateEvents();
+        this.millisecondIncrementer = millisecondIncrementer;
       }
     }
 
@@ -243,8 +263,8 @@ define([
 
       // TODO: These function calls are too specific and assume that there will
       // only ever be one actor.
-      app.view.canvas.backgroundView.update();
-      app.rekapi.update();
+      this.stylie.view.canvas.backgroundView.update();
+      this.stylie.rekapi.update();
     }
 
     ,'validateMillisecond': function (millisecond) {
@@ -287,7 +307,7 @@ define([
       this.$header.remove();
       this.$pinnedButtonArray.remove();
       this.remove();
-      util.deleteAllProperties(this);
+      _.empty(this);
     }
 
   });

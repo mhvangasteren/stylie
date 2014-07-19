@@ -4,9 +4,7 @@ define([
   ,'underscore'
   ,'backbone'
 
-  ,'src/app'
-  ,'src/constants'
-  ,'src/ui/background'
+  ,'src/view/background'
 
 ], function (
 
@@ -14,8 +12,6 @@ define([
   ,_
   ,Backbone
 
-  ,app
-  ,constant
   ,BackgroundView
 
 ) {
@@ -24,8 +20,14 @@ define([
 
   return Backbone.View.extend({
 
+    /**
+     * @param {Object} opts
+     *   @param {Stylie} stylie
+     *   @param {jQuery} $canvasBG
+     */
     'initialize': function (opts) {
-      _.extend(this, opts);
+      this.stylie = opts.stylie;
+      this.$canvasBG = opts.$canvasBG;
       this.initDOM();
     }
 
@@ -36,7 +38,8 @@ define([
       // There is only one header in the DOM.
       this.$header = $('header');
       this.backgroundView = new BackgroundView({
-        '$el': this.$canvasBG
+        'stylie': this.stylie
+        ,'el': this.$canvasBG[0]
         ,'height': height
         ,'width': width
       });

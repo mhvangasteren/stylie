@@ -4,7 +4,6 @@ define([
   ,'underscore'
   ,'backbone'
 
-  ,'src/app'
   ,'src/constants'
   ,'src/utils'
 
@@ -14,7 +13,6 @@ define([
   ,_
   ,Backbone
 
-  ,app
   ,constant
   ,util
 
@@ -28,8 +26,13 @@ define([
       'mousedown .rotation-control': 'onMousedownRotationControl'
     }
 
+    /**
+     * @param {Object} opts
+     *   @param {Stylie} stylie
+     */
     ,'initialize': function (opts) {
-      _.extend(this, opts);
+      this.stylie = opts.stylie;
+      this.owner = opts.owner;
       this.$el.dragon({
         'within': this.owner.$el.parent()
         ,'dragStart': _.bind(this.dragStart, this)
@@ -45,10 +48,10 @@ define([
 
       this._$cubelet.on('change', _.bind(this.onCubeletChange, this));
 
-      this._rotationModeStartHandle = Backbone.on(
-          constant.ROTATION_MODE_START, _.bind(this.onRotationModeStart, this));
-      this._rotationModeStopHandle = Backbone.on(
-          constant.ROTATION_MODE_STOP, _.bind(this.onRotationModeStop, this));
+      this.listenTo(Backbone, constant.ROTATION_MODE_START,
+          _.bind(this.onRotationModeStart, this));
+      this.listenTo(Backbone, constant.ROTATION_MODE_STOP,
+          _.bind(this.onRotationModeStop, this));
 
       this.model.on('change', _.bind(this.render, this));
       this.model.on('destroy', _.bind(this.tearDown, this));
@@ -108,20 +111,19 @@ define([
       });
       Backbone.trigger(constant.PATH_CHANGED);
       this.model.trigger('change');
-      app.rekapi.update();
+      this.stylie.rekapi.update();
     }
 
     ,'dimPathLine': function () {
-      app.view.canvas.backgroundView.update(true);
+      this.stylie.view.canvas.backgroundView.update(true);
     }
 
     ,'tearDown': function () {
       this._$crosshairContainer.remove();
       this._$cubelet.remove();
       this.remove();
-      Backbone.off(this._rotationModeStartHandle);
-      Backbone.off(this._rotationModeStopHandle);
-      util.deleteAllProperties(this);
+      this.stopListening();
+      _.empty(this);
     }
 
   });

@@ -4,7 +4,7 @@ define([
   ,'underscore'
   ,'backbone'
 
-  ,'src/app'
+  ,'src/constants'
 
 ], function (
 
@@ -12,7 +12,7 @@ define([
   ,_
   ,Backbone
 
-  ,app
+  ,constant
 
 ) {
 
@@ -24,9 +24,9 @@ define([
     ,'w3': 'w3'
   };
 
-  function getPrefixList (app) {
+  function getPrefixList (stylie) {
     var prefixList = [];
-    _.each(app.config.activeClasses, function (isActive, vendorName) {
+    _.each(stylie.config.activeClasses, function (isActive, vendorName) {
       if (isActive) {
         prefixList.push(checkboxToVendorMap[vendorName]);
       }
@@ -39,10 +39,19 @@ define([
 
     'events': { }
 
+    /**
+     * @param {Object} opts
+     *   @param {Stylie} stylie
+     *   @param {jQuery} $trigger
+     */
     ,'initialize': function (opts) {
-      _.extend(this, opts);
-      this.$trigger.on('click', _.bind(this.onTriggerClick, this));
+      this.stylie = opts.stylie;
+      this.$trigger = opts.$trigger;
+      this.$animationIteration = opts.$animationIteration;
       this.$actorEl = $('#rekapi-canvas .rekapi-actor');
+
+      this.$trigger.on('click', _.bind(this.onTriggerClick, this));
+      Backbone.on(constant.UPDATE_CSS_OUTPUT, _.bind(this.renderCSS, this));
     }
 
     ,'onTriggerClick': function (evt) {
@@ -50,22 +59,23 @@ define([
     }
 
     ,'renderCSS': function () {
-      var cssClassName = app.view.cssNameField.$el.val();
+      var stylie = this.stylie;
+      var cssClassName = stylie.view.cssNameField.$el.val();
 
       var keyframeCollection =
-          app.collection.actors.getCurrent().keyframeCollection;
+          stylie.collection.actors.getCurrent().keyframeCollection;
       var firstKeyframe = keyframeCollection.first();
       var offsets = this.isOutputOrientedToFirstKeyframe()
           ? {'x': -firstKeyframe.get('x'), 'y': -firstKeyframe.get('y')}
           : {'x': 0, 'y': 0};
       keyframeCollection.offsetKeyframes(offsets);
 
-      var cssOutput = app.rekapi.renderer.toString({
-        'vendors': getPrefixList(app)
+      var cssOutput = stylie.rekapi.renderer.toString({
+        'vendors': getPrefixList(stylie)
         ,'name': cssClassName
-        ,'iterations': app.$el.animationIteration.val()
-        ,'isCentered': app.config.isCenteredToPath
-        ,'fps': app.view.fpsSlider.getFPS()
+        ,'iterations': this.$animationIteration.val()
+        ,'isCentered': stylie.config.isCenteredToPath
+        ,'fps': stylie.view.fpsSlider.getFPS()
       });
 
       // Reverse the offset
@@ -81,7 +91,8 @@ define([
      * @return {boolean}
      */
     ,'isOutputOrientedToFirstKeyframe': function () {
-      return app.view.orientationView.getOrientation() === 'first-keyframe';
+      return this.stylie.view.orientationView.getOrientation()
+        === 'first-keyframe';
     }
   });
 });

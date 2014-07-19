@@ -4,7 +4,6 @@ define([
   ,'backbone'
   ,'rekapi-scrubber'
 
-  ,'src/app'
   ,'src/constants'
 
 ], function (
@@ -13,20 +12,23 @@ define([
   ,Backbone
   ,RekapiScrubber
 
-  ,app
   ,constant
 
 ) {
 
   return Backbone.View.extend({
 
+    /**
+     * @param {Object} opts
+     *   @param {Stylie} stylie
+     *   @param {jQuery} $canvasBG
+     */
     'initialize': function (opts) {
-      _.extend(this, opts);
-
-      this.scrubber = new RekapiScrubber(
-          app.rekapi, app.view.canvas.$canvasBG[0]);
-
+      this.stylie = opts.stylie;
+      this.$canvasBG = opts.$canvasBG;
+      this.scrubber = new RekapiScrubber(this.stylie.rekapi, this.$canvasBG[0]);
       this.$el = this.scrubber.$container;
+      this.el = this.scrubber.$container[0];
     }
 
     ,'fadeToggle': function () {

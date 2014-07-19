@@ -2,13 +2,9 @@ define([
 
   'underscore'
 
-  ,'src/app'
-
 ], function (
 
   _
-
-  ,app
 
 ) {
 
@@ -38,13 +34,6 @@ define([
 
       return params;
     }
-
-    ,'deleteAllProperties': function (obj) {
-      _.each(obj, function (value, key) {
-        delete obj[key];
-      });
-    }
-
   };
 
 });
