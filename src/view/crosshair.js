@@ -19,24 +19,26 @@ define([
 ) {
 
   var $win = $(window);
+  var $body = $(document.body);
 
   return Backbone.View.extend({
 
-    'events': {
+    events: {
       'mousedown .rotation-control': 'onMousedownRotationControl'
     }
 
     /**
      * @param {Object} opts
      *   @param {Stylie} stylie
+     *   @param {jQuery} $container
      */
-    ,'initialize': function (opts) {
+    ,initialize: function (opts) {
       this.stylie = opts.stylie;
-      this.owner = opts.owner;
+      this.$container = opts.$container;
       this.$el.dragon({
-        'within': this.owner.$el.parent()
-        ,'dragStart': _.bind(this.dragStart, this)
-        ,'dragEnd': _.bind(this.dragEnd, this)
+        within: this.$container
+        ,dragStart: _.bind(this.dragStart, this)
+        ,dragEnd: _.bind(this.dragEnd, this)
       });
 
       this._$crosshairContainer = this.$el.find('.crosshair-container');
@@ -48,77 +50,87 @@ define([
 
       this._$cubelet.on('change', _.bind(this.onCubeletChange, this));
 
-      this.listenTo(Backbone, constant.ROTATION_MODE_START,
+      this.listenTo(this.stylie, constant.ROTATION_MODE_START,
           _.bind(this.onRotationModeStart, this));
-      this.listenTo(Backbone, constant.ROTATION_MODE_STOP,
+      this.listenTo(this.stylie, constant.ROTATION_MODE_STOP,
           _.bind(this.onRotationModeStop, this));
 
-      this.model.on('change', _.bind(this.render, this));
-      this.model.on('destroy', _.bind(this.tearDown, this));
+      this.listenTo(this.model, 'change', _.bind(this.render, this));
+      this.listenTo(this.model, 'destroy', _.bind(this.teardown, this));
+
       this.render();
     }
 
-    ,'onMousedownRotationControl': function (evt) {
+    ,onMousedownRotationControl: function (evt) {
       evt.stopPropagation();
     }
 
-    ,'onRotationModeStart': function () {
-      this._$cubelet.show();
+    ,onRotationModeStart: function () {
+      this.$el.dragonDisable();
+      this._$cubelet
+        .show()
+        .cubeletShow();
     }
 
-    ,'onRotationModeStop': function () {
-      this._$cubelet.hide();
-      Backbone.trigger(constant.UPDATE_CSS_OUTPUT);
+    ,onRotationModeStop: function () {
+      this.$el.dragonEnable();
+      this._$cubelet
+        .hide()
+        .cubeletHide();
+
+      this.stylie.trigger(constant.UPDATE_CSS_OUTPUT);
     }
 
-    ,'onCubeletChange': function () {
+    ,onCubeletChange: function () {
       this.updateModel();
       this._$cubelet.cubeletApplyRotationToElement(this._$crosshairContainer);
     }
 
-    ,'dragStart': function (evt, ui) {
+    ,dragStart: function (evt, ui) {
+      $body.addClass('is-dragging-crosshair');
       this.dimPathLine();
     }
 
-    ,'dragEnd': function (evt, ui) {
+    ,dragEnd: function (evt, ui) {
+      $body.removeClass('is-dragging-crosshair');
       this.updateModel();
-      Backbone.trigger(constant.UPDATE_CSS_OUTPUT);
+      this.stylie.trigger(constant.UPDATE_CSS_OUTPUT);
     }
 
-    ,'render': function () {
+    ,render: function () {
       this.$el.css({
-        'left': this.model.get('x') + 'px'
-        ,'top': this.model.get('y') + 'px'
+        left: this.model.get('x') + 'px'
+        ,top: this.model.get('y') + 'px'
       });
       var rotationCoords = this._$cubelet.cubeletGetCoords();
       this._$cubelet.cubeletSetCoords({
-        'x': this.model.get('rX')
-        ,'y': this.model.get('rY')
-        ,'z': this.model.get('rZ')
+        scale: this.model.get('scale')
+        ,x: this.model.get('rX')
+        ,y: this.model.get('rY')
+        ,z: this.model.get('rZ')
       });
       this._$cubelet.cubeletApplyRotationToElement(this._$crosshairContainer);
     }
 
-    ,'updateModel': function () {
+    ,updateModel: function () {
       var rotationCoords = this._$cubelet.cubeletGetCoords();
       var pxTo = util.pxToNumber;
       this.model.set({
-        'x': pxTo(this.$el.css('left'))
-        ,'y': pxTo(this.$el.css('top'))
-        ,'rX': rotationCoords.x
-        ,'rY': rotationCoords.y
-        ,'rZ': rotationCoords.z
+        x: pxTo(this.$el.css('left'))
+        ,y: pxTo(this.$el.css('top'))
+        ,scale: rotationCoords.scale
+        ,rX: rotationCoords.x
+        ,rY: rotationCoords.y
+        ,rZ: rotationCoords.z
       });
-      Backbone.trigger(constant.PATH_CHANGED);
-      this.model.trigger('change');
-      this.stylie.rekapi.update();
+      this.stylie.trigger(constant.PATH_CHANGED);
     }
 
-    ,'dimPathLine': function () {
+    ,dimPathLine: function () {
       this.stylie.view.canvas.backgroundView.update(true);
     }
 
-    ,'tearDown': function () {
+    ,teardown: function () {
       this._$crosshairContainer.remove();
       this._$cubelet.remove();
       this.remove();

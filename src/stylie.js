@@ -79,19 +79,20 @@ define([
   var $body = $(document.body);
 
   /**
+   * @implements {Backbone.Events}
    * @constructor
    */
   function Stylie () {
     this.config = {
-      'activeClasses': {
-        'moz': false
-        ,'ms': false
-        ,'o': false
-        ,'webkit': false
-        ,'w3': true
+      activeClasses: {
+        moz: false
+        ,ms: false
+        ,o: false
+        ,webkit: false
+        ,w3: true
       }
     };
-    this.collection = {};
+
     this.view = {};
 
     this.config.queryString = util.getQueryParams();
@@ -106,7 +107,7 @@ define([
       this.rekapi.play();
     }
 
-    this.collection.actors = new ActorCollection([], { stylie: this });
+    this.actorCollection = new ActorCollection([], { stylie: this });
     this.animationModel = new AnimationModel({}, { stylie: this });
 
     this.initActors();
@@ -117,150 +118,158 @@ define([
     window.stylie = this;
   }
 
+  _.extend(Stylie.prototype, Backbone.Events);
+
   Stylie.prototype.initActors = function () {
     this.rekapi.addActor({
       context: $('#rekapi-canvas').children()[0]
     });
 
     var winWidth = $win.width();
-    var currentActorModel = this.collection.actors.getCurrent();
+    var currentActorModel = this.actorCollection.getCurrent();
     var halfCrossHairHeight = $('#crosshairs .crosshair:first').height() / 2;
     var crosshairStartingY = ($win.height() / 2) - halfCrossHairHeight;
 
     // Create the initial keyframes.
     _.each([0, constant.INITIAL_ANIMATION_DURATION], function (millisecond, i) {
       currentActorModel.keyframe(millisecond, {
-        'x': i
+        x: i
           ? winWidth - (winWidth / (i + 1))
           : 60 // TODO: Should this be a constant?
-        ,'y': crosshairStartingY
-        ,'rX': 0
-        ,'rY': 0
-        ,'rZ': 0
+        ,y: crosshairStartingY
+        ,scale: 1
+        ,rX: 0
+        ,rY: 0
+        ,rZ: 0
       }, 'linear linear linear linear linear');
     });
+
+    this.listenTo(currentActorModel, 'change', _.bind(function () {
+      this.rekapi.update();
+    }, this));
   };
 
   Stylie.prototype.initViews = function () {
     this.view.hotkeyHandler = new HotkeyHandlerView({
-      'stylie': this
-      ,'el': document.body
+      stylie: this
+      ,el: document.body
     });
 
     this.view.helpModal = new ModalView({
-      'el': document.getElementById('help-contents')
-      ,'$triggerEl': $('#help-trigger')
+      el: document.getElementById('help-contents')
+      ,$triggerEl: $('#help-trigger')
     });
 
     var $canvasBG = $('#tween-path');
 
     this.view.rekapiControls = new RekapiControlsView({
-      'stylie': this
-      ,'$canvasBG': $canvasBG
+      stylie: this
+      ,$canvasBG: $canvasBG
     });
 
     this.view.canvas = new CanvasView({
-      'stylie': this
-      ,'el': document.getElementById('rekapi-canvas')
-      ,'$canvasBG': $canvasBG
+      stylie: this
+      ,el: document.getElementById('rekapi-canvas')
+      ,$canvasBG: $canvasBG
     });
 
     this.view.showPath = new CheckboxView({
-      '$el': $('#show-path')
-      ,'callHandlerOnInit': true
-      ,'onChange': _.bind(function (evt, isChecked) {
+      $el: $('#show-path')
+      ,callHandlerOnInit: true
+      ,onChange: _.bind(function (evt, isChecked) {
         this.config.isPathShowing = !!isChecked;
-        this.rekapi.update();
         this.view.canvas.backgroundView.update();
       }, this)
     });
 
     this.view.controlPane = new PaneView({
-      'el': document.getElementById('control-pane')
+      el: document.getElementById('control-pane')
     });
 
     this.view.controlPaneTabs = new TabsView({
-      'el': document.querySelector('#control-pane')
+      el: document.querySelector('#control-pane')
     });
 
     this.view.cssOutput = new CSSOutputView({
-      'stylie': this
-      ,'el': document.querySelector('#css-output textarea')
-      ,'$trigger': this.view.controlPaneTabs.$el
+      stylie: this
+      ,el: document.querySelector('#css-output textarea')
+      ,$trigger: this.view.controlPaneTabs.$el
           .find('[data-target="css-output"]')
-      ,'$animationIteration': $('#iterations')
+      ,$animationIteration: $('#iterations')
     });
 
     this.view.fpsSlider = new FPSSliderView({
-      '$el': $('.quality-slider.fps .slider')
+      stylie: this
+      ,el: document.querySelector('.quality-slider.fps .slider')
     });
 
     var cssNameField = new AutoUpdateTextFieldView({
-      'el': document.getElementById('css-name')
+      el: document.getElementById('css-name')
     });
 
     cssNameField.onValReenter = _.bind(function (val) {
       this.config.className = val;
-      Backbone.trigger(constant.UPDATE_CSS_OUTPUT);
+      this.trigger(constant.UPDATE_CSS_OUTPUT);
     }, this);
 
     this.view.cssNameField = cssNameField;
 
     ['moz', 'ms', 'o', 'webkit', 'w3'].forEach(function (prefix) {
       this.view[prefix + 'Checkbox'] = new CheckboxView({
-        '$el': $('#' + prefix + '-toggle')
-        ,'onChange': _.bind(function (evt, isChecked) {
+        $el: $('#' + prefix + '-toggle')
+        ,onChange: _.bind(function (evt, isChecked) {
           this.config.activeClasses[prefix] = isChecked;
-          Backbone.trigger(constant.UPDATE_CSS_OUTPUT);
+          this.trigger(constant.UPDATE_CSS_OUTPUT);
         }, this)
       });
     }, this);
 
     this.view.htmlInput = new HTMLInputView({
-      '$el': $('#html-input textarea')
+      $el: $('#html-input textarea')
     });
 
     this.view.centerToPathCheckbox = new CheckboxView({
-      '$el': $('#center-to-path')
-      ,'callHandlerOnInit': true
-      ,'onChange': _.bind(function (evt, isChecked) {
-        this.config.isCenteredToPath = !!isChecked;
-        var tranformOrigin = this.config.isCenteredToPath
-          ? '0 0'
-          : '';
+      $el: $('#center-to-path')
+      ,callHandlerOnInit: true
+      ,onChange: _.bind(function (evt, isChecked) {
+        var isCenteredToPath = !!isChecked;
+        var tranformOrigin = isCenteredToPath ? '0 0' : '';
+
         this.view.htmlInput.$renderTarget.css(
           'transform-origin', tranformOrigin);
-        Backbone.trigger(constant.ACTOR_ORIGIN_CHANGED, true);
-        this.rekapi.update();
+        this.actorCollection.getCurrent().set(
+          'isCenteredToPath', isCenteredToPath);
       }, this)
     });
 
-    this.view.customEaseView = new CustomEaseView({
-      'stylie': this
-      ,'el': document.getElementById('custom-ease')
+    this.view.customEase = new CustomEaseView({
+      stylie: this
+      ,el: document.getElementById('custom-ease')
     });
 
-    this.view.topLevelAlertView = new AlertView({
-      'el': document.getElementById('top-level-alert')
+    this.view.topLevelAlert = new AlertView({
+      el: document.getElementById('top-level-alert')
     });
 
-    var topLevelAlertView = this.view.topLevelAlertView;
-    Backbone.on(constant.ALERT_ERROR,
-        _.bind(topLevelAlertView.show, topLevelAlertView));
+    var topLevelAlert = this.view.topLevelAlert;
+    this.on(constant.ALERT_ERROR,
+        _.bind(topLevelAlert.show, topLevelAlert));
 
-    this.view.saveView = new SaveView({
-      'el': document.getElementById('save-controls')
-      ,'model': this.animationModel
+    this.view.save = new SaveView({
+      stylie: this
+      ,el: document.getElementById('save-controls')
+      ,model: this.animationModel
     });
 
-    this.view.loadView = new LoadView({
-      'stylie': this
-      ,'el': document.getElementById('load-controls')
-      ,'model': this.animationModel
+    this.view.load = new LoadView({
+      stylie: this
+      ,el: document.getElementById('load-controls')
+      ,model: this.animationModel
     });
 
-    this.view.orientationView = new OrientationControlsView({
-      'el': document.getElementById('orientation-controls')
+    this.view.orientation = new OrientationControlsView({
+      stylie: this
+      ,el: document.getElementById('orientation-controls')
     });
   };
 

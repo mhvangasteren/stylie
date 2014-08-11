@@ -16,19 +16,22 @@ define([
 
   return Backbone.View.extend({
 
-    'events': {
-      'change': 'onChange'
+    events: {
+      change: 'onChange'
     }
 
-    ,'initialize': function (opts) {
-      _.extend(this, opts);
+    /**
+     * @param {Stylie} stylie
+     */
+    ,initialize: function (opts) {
+      this.stylie = opts.stylie;
     }
 
-    ,'onChange': function () {
-      Backbone.trigger(constant.UPDATE_CSS_OUTPUT);
+    ,onChange: function () {
+      this.stylie.trigger(constant.UPDATE_CSS_OUTPUT);
     }
 
-    ,'getOrientation': function () {
+    ,getOrientation: function () {
       return this.$el.serialize().split('=')[1];
     }
 

@@ -18,7 +18,7 @@ define([
 
   return Backbone.View.extend({
 
-    'events': {
+    events: {
       'click .icon-remove': 'onRemoveClick'
       ,'click #animation-load': 'loadAnimation'
     }
@@ -29,16 +29,16 @@ define([
      *   @param {AnimationModel} model
      *   @param {Element} el
      */
-    ,'initialize': function (opts) {
+    ,initialize: function (opts) {
       this.stylie = opts.stylie;
       this.$animationSelect = this.$el.find('select');
       this.refreshAnimationList();
 
-      Backbone.on(constant.ANIMATION_SAVED,
-        _.bind(this.refreshAnimationList, this));
+      this.listenTo(this.stylie,
+          constant.ANIMATION_SAVED, _.bind(this.refreshAnimationList, this));
     }
 
-    ,'refreshAnimationList': function (currentAnimation) {
+    ,refreshAnimationList: function (currentAnimation) {
       this.$animationSelect.children().remove();
       _.each(this.model.getAnimationList(), function (animationName) {
         var $option = $(document.createElement('option'));
@@ -51,26 +51,26 @@ define([
       this.$animationSelect.val(currentAnimation);
     }
 
-    ,'onRemoveClick': function () {
+    ,onRemoveClick: function () {
       this.removeAnimation(this.$animationSelect.val());
     }
 
-    ,'removeAnimation': function (animationName) {
+    ,removeAnimation: function (animationName) {
       this.model.removeAnimation(animationName);
       this.refreshAnimationList();
     }
 
-    ,'loadAnimation': function () {
+    ,loadAnimation: function () {
       var val = this.$animationSelect.val();
 
       if (!val) {
-        Backbone.trigger(
+        this.stylie.trigger(
             constant.ALERT_ERROR, 'Please specify an animation to load.');
         return;
       }
 
       this.model.load(val);
-      this.stylie.view.saveView.setInputValue(val);
+      this.stylie.view.save.setInputValue(val);
     }
 
   });

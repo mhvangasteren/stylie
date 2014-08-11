@@ -33,13 +33,13 @@ define([
      * @param {Object} opts
      *   @param {Stylie} stylie
      */
-    'initialize': function (opts) {
+    initialize: function (opts) {
       this.stylie = opts.stylie;
       this.crosshairViews = {};
       this.listenTo(this.model, 'change', _.bind(this.render, this));
     }
 
-    ,'render': function () {
+    ,render: function () {
       this.$el.children().detach();
 
       var orderedViews = _.sortBy(this.crosshairViews,
@@ -52,17 +52,17 @@ define([
       }, this);
     }
 
-    ,'addCrosshairView': function (model) {
+    ,addCrosshairView: function (model) {
       var keyframeCount =
-        this.stylie.collection.actors.getCurrent().getLength();
+        this.stylie.actorCollection.getCurrent().getLength();
       var $el = $(Mustache.render(CROSSHAIR_TEMPLATE));
       this.$el.append($el);
 
       this.crosshairViews[model.cid] = new CrosshairView({
-        'stylie': this.stylie
-        ,'el': $el[0]
-        ,'model': model
-        ,'owner': this
+        stylie: this.stylie
+        ,el: $el[0]
+        ,model: model
+        ,$container: this.$el.parent()
       });
 
       this.listenTo(model, 'destroy', _.bind(function () {

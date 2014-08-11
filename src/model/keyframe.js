@@ -13,25 +13,25 @@ define([
   ,constant
 
 ) {
-  return Backbone.Model.extend({
+  var KeyframeModel = Backbone.Model.extend({
 
     /**
      * @param {Object} attrs
-     * @param {ActorModel} owner
+     * @param {ActorModel} actorModel
      */
-    'initialize': function (attrs, opts) {
+    initialize: function (attrs, opts) {
       this.stylie = this.collection.stylie;
-      this.owner = opts.owner;
+      this.actorModel = opts.actorModel;
 
       // TODO: This message subscription and event binding should be
       // consolidated into one operation.
-      this._boundModifyKeyframeHandler = _.bind(this.modifyKeyframe, this);
-      Backbone.on(
-          constant.ACTOR_ORIGIN_CHANGED, this._boundModifyKeyframeHandler);
-      this.on('change', this._boundModifyKeyframeHandler);
+      var updateRawKeyframe = _.bind(this.updateRawKeyframe, this);
+      this.listenTo(
+        this.actorModel, 'change:isCenteredToPath', updateRawKeyframe);
+      this.on('change', updateRawKeyframe);
     }
 
-    ,'validate': function (attrs) {
+    ,validate: function (attrs) {
       var foundNaN = false;
       _.each(attrs, function (attr) {
         if (typeof attr !== 'number') {
@@ -44,74 +44,103 @@ define([
       }
     }
 
-    ,'modifyKeyframe': function (opt_preventRekapiUpdate) {
-      this.stylie.collection.actors.getCurrent().modifyKeyframe(
-          this.get('millisecond'), this.getCSS());
-
-      if (!opt_preventRekapiUpdate) {
-        this.stylie.rekapi.update();
-      }
+    ,updateRawKeyframe: function () {
+      this.actorModel.get('actor').modifyKeyframe(
+          this.attributes.millisecond, this.getCSS(),
+          { transform: this.attributes.easing });
     }
 
-    ,'moveKeyframe': function (to) {
-      this.stylie.collection.actors.getCurrent().moveKeyframe(
-          this.get('millisecond'), to);
-
-      this.set('millisecond', to);
-
-      // TODO: Maybe check to see if this is the last keyframe in the
-      // collection before publishing?
-      Backbone.trigger(constant.ANIMATION_LENGTH_CHANGED);
+    /**
+     * @param {number} toMillisecond
+     */
+    ,moveTo: function (toMillisecond) {
+      this.actorModel.moveKeyframe(this.attributes.millisecond, toMillisecond);
     }
 
-    ,'destroy': function () {
-      Backbone.off(
-          constant.ACTOR_ORIGIN_CHANGED, this._boundModifyKeyframeHandler);
-      this.off('change', this._boundModifyKeyframeHandler);
+    ,destroy: function () {
       this.trigger('destroy');
+      this.stopListening();
+      this.off();
     }
 
-    ,'setEasingString': function (newEasingString) {
-      this.get('easing', newEasingString);
-      this.owner.modifyKeyframe(
-          this.get('millisecond'), {}, { 'transform': newEasingString });
-    }
-
-    ,'getEasingObject': function () {
+    ,getEasingObject: function () {
       var easingChunks = this.get('easing').split(' ');
       return {
-        'x': easingChunks[0]
-        ,'y': easingChunks[1]
-        ,'rX': easingChunks[2]
-        ,'rY': easingChunks[3]
-        ,'rZ': easingChunks[4]
+        x: easingChunks[0]
+        ,y: easingChunks[1]
+        ,scale: easingChunks[2]
+        ,rX: easingChunks[3]
+        ,rY: easingChunks[4]
+        ,rZ: easingChunks[5]
       };
     }
 
-    ,'getCSS': function () {
+    ,getCSS: function () {
+      var attributes = this.attributes;
+
+      return KeyframeModel.createCSSRuleObject(
+          attributes.x
+          ,attributes.y
+          ,attributes.scale
+          ,attributes.rX
+          ,attributes.rY
+          ,attributes.rZ
+          ,this.actorModel.get('isCenteredToPath'));
+    }
+
+    ,getAttrs: function () {
       return {
-        'transform':
-          ['translate(', this.get('x')
-            ,'px, ', this.get('y')
-            ,'px) rotateX(', this.get('rX')
-            ,'deg) rotateY(', this.get('rY')
-            ,'deg) rotateZ(', this.get('rZ')
-            ,this.stylie.config.isCenteredToPath
+        x: this.get('x')
+        ,y: this.get('y')
+        ,scale: this.get('scale')
+        ,rX: this.get('rX')
+        ,rY: this.get('rY')
+        ,rZ: this.get('rZ')
+      };
+    }
+
+    /**
+     * @return {{x: number, y: number, rX: number, rY: number, rZ: number}}
+     */
+    ,getEasings: function () {
+      var easingChunks = this.attributes.easing.split(' ');
+
+      return {
+        x: easingChunks[0]
+        ,y: easingChunks[1]
+        ,scale: easingChunks[2]
+        ,rX: easingChunks[3]
+        ,rY: easingChunks[4]
+        ,rZ: easingChunks[5]
+      };
+    }
+  }, {
+
+    /**
+     * @param {number} x
+     * @param {number} y
+     * @param {number} scale
+     * @param {number} rX
+     * @param {number} rY
+     * @param {number} rZ
+     * @param {boolean} isCentered
+     */
+    createCSSRuleObject: function (x, y, scale, rX, rY, rZ, isCentered) {
+      return {
+        transform:
+          [
+            'translate(', x ,'px, ', y
+            ,'px) scale(', scale, ')'
+            ,' rotateX(', rX
+            ,'deg) rotateY(', rY
+            ,'deg) rotateZ(', rZ
+            ,isCentered
               ? 'deg) translate(-50%, -50%)'
               : 'deg)'
             ].join('')
       };
     }
-
-    ,'getAttrs': function () {
-      return {
-        'x': this.get('x')
-        ,'y': this.get('y')
-        ,'rX': this.get('rX')
-        ,'rY': this.get('rY')
-        ,'rZ': this.get('rZ')
-      };
-    }
-
   });
+
+  return KeyframeModel;
 });

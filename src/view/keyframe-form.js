@@ -26,15 +26,12 @@ define([
 
   function incrementerGeneratorHelper ($el) {
     var incrementerFieldView = new IncrementerFieldView({
-      'el': $el[0]
+      el: $el[0]
     });
 
     incrementerFieldView.onValReenter = _.bind(function (val) {
       this.model.set($el.data('keyframeattr'), +val);
-      Backbone.trigger(constant.PATH_CHANGED);
-      // TODO: Should access actor through the owner model
-      this.stylie.collection.actors.getCurrent(0).updateKeyframes();
-      this.stylie.rekapi.update();
+      this.stylie.trigger(constant.PATH_CHANGED);
     }, this);
 
     return incrementerFieldView;
@@ -76,7 +73,7 @@ define([
 
   return Backbone.View.extend({
 
-    'events': {
+    events: {
       'click h3': 'editMillisecond'
       ,'click .remove button': 'removeKeyframe'
     }
@@ -84,12 +81,10 @@ define([
     /**
      * @param {Object} opts
      *   @param {Stylie} stylie
-     *   @param {ActorModel} owner
      *   @param {KeyframeModel} model
      */
-    ,'initialize': function (opts) {
+    ,initialize: function (opts) {
       this.stylie = opts.stylie;
-      this.owner = opts.owner;
 
       this.isEditingMillisecond = false;
       this.canEditMillisecond = !this.isFirstKeyfame();
@@ -97,13 +92,13 @@ define([
       this.$el = $(KEYFRAME_TEMPLATE);
       this.initDOMReferences();
       this.buildDOM();
-      this.model.on('change', _.bind(this.render, this));
-      this.model.on('destroy', _.bind(this.tearDown, this));
+      this.listenTo(this.model, 'change', _.bind(this.render, this));
+      this.listenTo(this.model, 'destroy', _.bind(this.teardown, this));
       this.initIncrementers();
       this.render();
     }
 
-    ,'buildDOM': function () {
+    ,buildDOM: function () {
       var isFirstKeyfame = this.isFirstKeyfame();
 
       if (this.isRemovable()) {
@@ -111,11 +106,14 @@ define([
         this.$pinnedButtonArray.append($template);
       }
 
-      _.each(['x', 'y', 'rX', 'rY', 'rZ'], function (property) {
+      _.each(['x', 'y', 'scale', 'rX', 'rY', 'rZ'], function (property) {
+        // TODO: This is ugly!  Make it not ugly!
+        var propertyLabel = property === 'scale' ? 'S' : property.toUpperCase();
+
         var template = Mustache.render(KEYFRAME_PROPERTY_TEMPLATE, {
-          'property': property
-          ,'propertyLabel': property.toUpperCase()
-          ,'value': this.model.get(property)
+          property: property
+          ,propertyLabel: propertyLabel
+          ,value: this.model.get(property)
         });
 
         var $template = $(template);
@@ -130,15 +128,16 @@ define([
       }, this);
     }
 
-    ,'initDOMReferences': function () {
+    ,initDOMReferences: function () {
       this.$header = this.$el.find('h3');
       this.$pinnedButtonArray = this.$el.find('.pinned-button-array');
     }
 
-    ,'initIncrementers': function () {
+    ,initIncrementers: function () {
       _.each([
           this.$inputX,
           this.$inputY,
+          this.$inputSCALE,
           this.$inputRX,
           this.$inputRY,
           this.$inputRZ], function ($el) {
@@ -148,13 +147,15 @@ define([
             incrementerGeneratorHelper.call(this, $input);
       }, this);
 
+      this.incrementerViewSCALE.increment = 0.1;
+
       if (!this.isFirstKeyfame()) {
         var template = Mustache.render(MILLISECOND_INPUT_TEMPLATE, {
-          'value': this.model.get('millisecond')
+          value: this.model.get('millisecond')
         });
 
         var millisecondIncrementer = new IncrementerFieldView({
-          'el': $(template)[0]
+          el: $(template)[0]
         });
 
         millisecondIncrementer.onBlur =
@@ -176,104 +177,83 @@ define([
       }
     }
 
-    ,'initEaseSelect': function (propertyName, previousSibling) {
+    ,initEaseSelect: function (propertyName, previousSibling) {
       var viewName = 'easeSelectView' + propertyName.toUpperCase();
       var inputName = 'input'  + propertyName.toUpperCase();
       var template = Mustache.render(EASE_SELECT_TEMPLATE, {
-          'property': propertyName
+          property: propertyName
         });
 
       var view = this[viewName] = new EaseSelectView({
-        '$el': $(template)
-        ,'owner': this
+        el: $(template)[0]
+        ,model: this.model
       });
+
+      this.listenTo(view, 'change', _.bind(this.updateEasingString, this));
 
       return view;
     }
 
-    ,'getKeyframeIndex': function () {
+    ,getKeyframeIndex: function () {
       return this.model.collection.indexOf(this.model);
     }
 
-    ,'isFirstKeyfame': function () {
+    ,isFirstKeyfame: function () {
       return this.getKeyframeIndex() === 0;
     }
 
-    ,'isRemovable': function () {
+    ,isRemovable: function () {
       return this.getKeyframeIndex() > 0;
     }
 
-    ,'onMillisecondIncrementerBlur': function (evt) {
+    ,onMillisecondIncrementerBlur: function (evt) {
       this.millisecondIncrementer.$el.detach();
       var millisecond = this.validateMillisecond(
           this.millisecondIncrementer.$el.val());
 
-      if (this.model.owner.hasKeyframeAt(millisecond)) {
-        if (millisecond !== this.model.get('millisecond')) {
-          Backbone.trigger(constant.ALERT_ERROR,
-              'There is already a keyframe at millisecond '
-              + millisecond + '.');
-        }
-      } else {
-        this.model.moveKeyframe(millisecond);
-        this.owner.model.refreshKeyframeOrder();
-      }
-
+      this.model.moveTo(millisecond);
       this.renderHeader();
       this.isEditingMillisecond = false;
     }
 
-    ,'render': function () {
+    ,render: function () {
       this.renderHeader();
 
-      // Yikes!
-      //
-      // TODO: Make this less repetitive.
-      if (this.model.get('x') !== parseFloat(this.$inputX.val())) {
-        this.incrementerViewX.$el.val(this.model.get('x'));
-      }
-      if (this.model.get('y') !== parseFloat(this.$inputY.val())) {
-        this.incrementerViewY.$el.val(this.model.get('y'));
-      }
-      if (this.model.get('rX') !== parseFloat(this.$inputRX.val())) {
-        this.incrementerViewRX.$el.val(this.model.get('rX'));
-      }
-      if (this.model.get('rY') !== parseFloat(this.$inputRY.val())) {
-        this.incrementerViewRY.$el.val(this.model.get('rY'));
-      }
-      if (this.model.get('rZ') !== parseFloat(this.$inputRZ.val())) {
-        this.incrementerViewRZ.$el.val(this.model.get('rZ'));
-      }
+      ['x', 'y', 'scale', 'rX', 'rY', 'rZ'].forEach(function (axis) {
+        var upperAxis = axis.toUpperCase();
+        var axisValue = this.model.get(axis);
+
+        if (axisValue !== parseFloat(this['$input' + upperAxis].val())) {
+          this['incrementerView' + upperAxis].$el.val(axisValue);
+        }
+      }, this);
     }
 
-    ,'renderHeader': function () {
+    ,renderHeader: function () {
       this.$header.text(this.model.get('millisecond'));
     }
 
-    ,'updateEasingString': function () {
+    ,updateEasingString: function () {
       var xEasing = this.easeSelectViewX.$el.val();
       var yEasing = this.easeSelectViewY.$el.val();
+      var scaleEasing = this.easeSelectViewSCALE.$el.val();
       var rXEasing = this.easeSelectViewRX.$el.val();
       var rYEasing = this.easeSelectViewRY.$el.val();
       var rZEasing = this.easeSelectViewRZ.$el.val();
       var newEasingString = [
-          xEasing, yEasing, rXEasing, rYEasing, rZEasing].join(' ');
+          xEasing, yEasing, scaleEasing, rXEasing, rYEasing, rZEasing].join(' ');
 
-      this.model.setEasingString(newEasingString);
-
-      // TODO: These function calls are too specific and assume that there will
-      // only ever be one actor.
+      this.model.set('easing', newEasingString);
       this.stylie.view.canvas.backgroundView.update();
-      this.stylie.rekapi.update();
     }
 
-    ,'validateMillisecond': function (millisecond) {
+    ,validateMillisecond: function (millisecond) {
       return isNaN(millisecond)
         ? 0
         : Math.abs(+millisecond);
     }
 
-    ,'editMillisecond': function () {
+    ,editMillisecond: function () {
       if (this.isEditingMillisecond || !this.canEditMillisecond) {
         return;
       }
@@ -289,19 +269,19 @@ define([
         .focus();
     }
 
-    ,'removeKeyframe': function () {
+    ,removeKeyframe: function () {
       this.model.destroy();
     }
 
-    ,'tearDown': function () {
+    ,teardown: function () {
       if (this.model.get('millisecond') > 0) {
-        _.each(['X', 'Y', 'RX', 'RY', 'RZ'], function (axis) {
-          this['easeSelectView' + axis].tearDown();
-          this['incrementerView' + axis].tearDown();
+        _.each(['X', 'Y', 'SCALE', 'RX', 'RY', 'RZ'], function (axis) {
+          this['easeSelectView' + axis].teardown();
+          this['incrementerView' + axis].teardown();
           this['$input' + axis].remove();
         }, this);
 
-        this.millisecondIncrementer.tearDown();
+        this.millisecondIncrementer.teardown();
       }
 
       this.$header.remove();
